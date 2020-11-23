@@ -40,7 +40,8 @@ import java.util.Vector;
  */
 public class Main {
 
-  private static final String VERSION = "1.1.4";
+  // Versions of ODFDOM and ODF Validator are equal
+  private static final String VERSION = JarManifest.getVersion();
 
   /** Creates a new instance of Main */
   public Main() {}
@@ -58,7 +59,6 @@ public class Main {
     String aOutputFileName = null;
     String aExcludeRegExp = null;
     boolean bPrintGenerator = false;
-    boolean bUseMathDTD = false;
     boolean bPrintHelp = false;
     boolean bPrintVersion = false;
     boolean bRecursive = false;
@@ -75,7 +75,7 @@ public class Main {
       if (aArg.equals("-c")) {
         eMode = OdfValidatorMode.CONFORMANCE;
       } else if (aArg.equals("-d")) {
-        bUseMathDTD = true;
+        // ignore: bUseMathDTD = true;
       } else if (aArg.equals("-e")) {
         eMode = OdfValidatorMode.EXTENDED_CONFORMANCE;
       } else if (aArg.equals("-f")) {
@@ -214,11 +214,11 @@ public class Main {
         aConfig.setProperty(Configuration.DSIG_SCHEMA, aDSigSchemaFileName);
       }
       if (aMathMLSchemaFileName != null) {
-        aConfig.setProperty(Configuration.MATHML2_SCHEMA, aMathMLSchemaFileName);
+        aConfig.setProperty(Configuration.MATHML3_SCHEMA, aMathMLSchemaFileName);
       }
 
       PrintStream aOut = aOutputFileName != null ? new PrintStream(aOutputFileName) : System.out;
-      ODFValidator aValidator = new ODFValidator(aConfig, nLogLevel, aVersion, bUseMathDTD);
+      ODFValidator aValidator = new ODFValidator(aConfig, nLogLevel, aVersion);
 
       if (aConfigFileName != null) {
         aValidator.validate(aOut, aConfig, eMode);
@@ -253,11 +253,12 @@ public class Main {
     System.out.println("-O: Use ODF schema <schemafile> for validation");
     System.out.println("-M: Use ODF manifest schema <schemafile> for validation");
     System.out.println("-D: Use ODF dsig schema <schemafile> for validation");
-    System.out.println("-m: Use MathML2 schema <schemafile> for validation");
+    System.out.println("-m: Use specific MathML schema <schemafile> for validation");
     System.out.println("-V: Print version");
     System.out.println("-c: Check conformance (default for ODF 1.2 and 1.3 documents)");
     System.out.println("-e: Check extended conformance (ODF 1.2 and 1.3 documents only)");
-    System.out.println("-d: Use MathML DTD rather than MathML2 schema for validation");
+    System.out.println(
+        "-d: deprecated and ignored; Whether to use MathML DTD or MathML2 schema for validation is auto-detected");
     System.out.println("-f: Use filterfile <filterfile>");
     System.out.println("-g: Show <odffiles> generators and exit");
     System.out.println("-h: Print this help and exit");

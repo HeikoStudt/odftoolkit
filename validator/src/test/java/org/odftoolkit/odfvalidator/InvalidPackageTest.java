@@ -44,6 +44,9 @@ public class InvalidPackageTest extends OdfValidatorTestBase {
     }
     Assert.assertTrue(
         output.contains(
+            "testInvalidPkg1.odt/mimetype:  Error: mimetype is not an ODFMediaTypes mimetype"));
+    Assert.assertTrue(
+        output.contains(
             "testInvalidPkg1.odt/mimetype:  Error: The file 'mimetype' is not the first file in the ODF package"));
     Assert.assertTrue(
         output.contains(
@@ -54,7 +57,7 @@ public class InvalidPackageTest extends OdfValidatorTestBase {
     Assert.assertTrue(
         output.contains(
             "testInvalidPkg1.odt/META-INF/manifest.xml:  Error: The file 'Configurations2/accelerator/current.xml' shall not be listed in the 'META-INF/manifest.xml' file as it does not exist in the ODF package"));
-    Assert.assertTrue(output.contains("testInvalidPkg1.odt:  Info: 7 errors, 10 warnings"));
+    Assert.assertTrue(output.contains("testInvalidPkg1.odt:  Info: 8 errors, 10 warnings"));
   }
 
   @Test
@@ -69,6 +72,9 @@ public class InvalidPackageTest extends OdfValidatorTestBase {
     }
     Assert.assertTrue(
         output.contains(
+            "testInvalidPkg1.odt/mimetype:  Error: mimetype is not an ODFMediaTypes mimetype"));
+    Assert.assertTrue(
+        output.contains(
             "testInvalidPkg1.odt/mimetype:  Warning: The file 'mimetype' is not the first file in the ODF package"));
     Assert.assertTrue(
         output.contains(
@@ -79,7 +85,7 @@ public class InvalidPackageTest extends OdfValidatorTestBase {
     Assert.assertTrue(
         output.contains(
             "testInvalidPkg1.odt/META-INF/manifest.xml:  Error: The file 'Configurations2/accelerator/current.xml' shall not be listed in the 'META-INF/manifest.xml' file as it does not exist in the ODF package"));
-    Assert.assertTrue(output.contains("testInvalidPkg1.odt:  Info: 10 errors, 11 warnings"));
+    Assert.assertTrue(output.contains("testInvalidPkg1.odt:  Info: 11 errors, 11 warnings"));
   }
 
   @Test
@@ -157,7 +163,7 @@ public class InvalidPackageTest extends OdfValidatorTestBase {
       t.printStackTrace(new PrintWriter(errors));
       Assert.fail(t.toString() + "\n" + errors.toString());
     }
-    Assert.assertTrue(
+    Assert.assertFalse(
         output.contains(
             "The document is encrypted. Validation of encrypted documents is not supported."));
     java.util.logging.Logger.getLogger(getClass().getName())

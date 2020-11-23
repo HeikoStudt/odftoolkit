@@ -50,9 +50,7 @@ public class ODFValidator implements ODFValidatorProvider {
   // User provided ODF version
   protected OdfVersion m_aVersion = null;
   protected OdfVersion mOdfPackageVersion = null;
-  // User provided preference for using Math DTD
-  protected boolean m_bUseMathDTD = false;
-  // Validatore and configuration cache
+  // Validator and configuration cache
   private HashMap<String, Schema> m_aSchemaMap = null;
   private HashMap<OdfVersion, Configuration> m_aConfigurationMap = null;
   // Generator from last validateFile or validateStream call
@@ -60,30 +58,23 @@ public class ODFValidator implements ODFValidatorProvider {
   private static final String MISSING_ODF_VERSION = " 'Missing ODF version'";
 
   /** Creates a new instance of Validator */
-  public ODFValidator(
-      Configuration aConfig, Logger.LogLevel nLogLevel, OdfVersion aVersion, boolean bUseMathDTD)
+  public ODFValidator(Configuration aConfig, Logger.LogLevel nLogLevel, OdfVersion aVersion)
       throws ODFValidatorException {
 
     m_nLogLevel = nLogLevel;
     m_aConfig = aConfig;
     m_aVersion = aVersion;
-    m_bUseMathDTD = bUseMathDTD;
     Logger.enableHTML(false);
   }
 
   /** Creates a new instance of Validator */
   public ODFValidator(
-      Configuration aConfig,
-      Logger.LogLevel nLogLevel,
-      boolean logAsHTML,
-      OdfVersion aVersion,
-      boolean bUseMathDTD)
+      Configuration aConfig, Logger.LogLevel nLogLevel, boolean logAsHTML, OdfVersion aVersion)
       throws ODFValidatorException {
 
     m_nLogLevel = nLogLevel;
     m_aConfig = aConfig;
     m_aVersion = aVersion;
-    m_bUseMathDTD = bUseMathDTD;
     Logger.enableHTML(logAsHTML);
   }
 
@@ -231,18 +222,16 @@ public class ODFValidator implements ODFValidatorProvider {
 
   public Validator getMathMLValidator(PrintStream aOut, OdfVersion aVersion)
       throws ODFValidatorException {
-    return getValidatorForSchema(aOut, getSchemaFileName(Configuration.MATHML2_SCHEMA, aVersion));
+    return getValidatorForSchema(aOut, getSchemaFileName(Configuration.MATHML3_SCHEMA, aVersion));
   }
 
   public String getMathMLDTDSystemId(OdfVersion aVersion) throws ODFValidatorException {
     String aDTD = null;
-    if (m_bUseMathDTD) {
-      Configuration aConfig = m_aConfig != null ? m_aConfig : getConfiguration(aVersion);
+    Configuration aConfig = m_aConfig != null ? m_aConfig : getConfiguration(aVersion);
 
-      aDTD = aConfig.getProperty(Configuration.MATHML_SCHEMA);
-      if (m_aConfig == null && aDTD != null && aDTD.length() > 0) {
-        aDTD = InternalResources.createInternalResourceIdentifier(aDTD);
-      }
+    aDTD = aConfig.getProperty(Configuration.MATHML1_01_SCHEMA);
+    if (m_aConfig == null && aDTD != null && aDTD.length() > 0) {
+      aDTD = InternalResources.createInternalResourceIdentifier(aDTD);
     }
 
     return aDTD;

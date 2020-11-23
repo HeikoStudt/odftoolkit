@@ -60,8 +60,6 @@ import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
@@ -74,6 +72,8 @@ import javax.xml.parsers.SAXParserFactory;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.URIResolver;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.apache.xerces.dom.DOMXSImplementationSourceImpl;
 import org.odftoolkit.odfdom.doc.OdfDocument;
 import org.odftoolkit.odfdom.doc.OdfDocument.OdfMediaType;
@@ -131,8 +131,8 @@ public class OdfPackage implements Closeable {
   private String mBaseURI;
   private ZipHelper mZipFile;
   private Resolver mResolver;
-  private Map<String, ZipEntry> mZipEntries;
-  private HashMap<String, ZipEntry> mOriginalZipEntries;
+  private Map<String, ZipArchiveEntry> mZipEntries;
+  private HashMap<String, ZipArchiveEntry> mOriginalZipEntries;
   private Map<String, OdfFileEntry> mManifestEntries;
   // All opened documents from the same package are cached (including the root document)
   private Map<String, OdfPackageDocument> mPkgDocuments;
@@ -535,7 +535,7 @@ public class OdfPackage implements Closeable {
   // readZip();
   // }
   private void readZip() throws SAXException, IOException {
-    mZipEntries = new HashMap<String, ZipEntry>();
+    mZipEntries = new HashMap<String, ZipArchiveEntry>();
     String firstEntryName = mZipFile.entriesToMap(mZipEntries);
     if (mZipEntries.isEmpty()) {
       OdfValidationException ve =
@@ -553,7 +553,7 @@ public class OdfPackage implements Closeable {
 
       // ToDo: Remove all META-INF/* files from the fileEntries of
       // Manifest
-      mOriginalZipEntries = new HashMap<String, ZipEntry>();
+      mOriginalZipEntries = new HashMap<String, ZipArchiveEntry>();
       mOriginalZipEntries.putAll(mZipEntries);
       mZipEntries.remove(OdfPackage.OdfFile.MEDIA_TYPE.getPath());
       mZipEntries.remove(OdfPackage.OdfFile.MANIFEST.getPath());
@@ -674,7 +674,7 @@ public class OdfPackage implements Closeable {
    * @throws SAXException
    */
   private void initializeMediaType(String firstEntryName) throws SAXException, IOException {
-    ZipEntry mimetypeEntry = mZipEntries.get(OdfPackage.OdfFile.MEDIA_TYPE.getPath());
+    ZipArchiveEntry mimetypeEntry = mZipEntries.get(OdfPackage.OdfFile.MEDIA_TYPE.getPath());
     if (mimetypeEntry != null) {
       if (mErrorHandler != null) {
         validateMimeTypeEntry(mimetypeEntry, firstEntryName);
@@ -735,13 +735,13 @@ public class OdfPackage implements Closeable {
     }
   }
 
-  private void validateMimeTypeEntry(ZipEntry mimetypeEntry, String firstEntryName)
+  private void validateMimeTypeEntry(ZipArchiveEntry mimetypeEntry, String firstEntryName)
       throws SAXException {
 
-    if (mimetypeEntry.getMethod() != ZipEntry.STORED) {
+    if (mimetypeEntry.getMethod() != ZipArchiveEntry.STORED) {
       logValidationError(OdfPackageConstraint.MIMETYPE_IS_COMPRESSED, getBaseURI());
     }
-    if (mimetypeEntry.getExtra() != null) {
+    if (mimetypeEntry.getExtra() != null && mimetypeEntry.getExtra().length > 0) {
       logValidationError(OdfPackageConstraint.MIMETYPE_HAS_EXTRA_FIELD, getBaseURI());
     }
     if (!OdfFile.MEDIA_TYPE.getPath().equals(firstEntryName)) {
@@ -760,7 +760,8 @@ public class OdfPackage implements Closeable {
   }
 
   /** @returns the media type of the root document from the manifest.xml */
-  private String getMediaTypeFromEntry(ZipEntry mimetypeEntry) throws SAXException, IOException {
+  private String getMediaTypeFromEntry(ZipArchiveEntry mimetypeEntry)
+      throws SAXException, IOException {
     String entryMediaType = null;
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
@@ -1134,57 +1135,55 @@ public class OdfPackage implements Closeable {
     } else {
       rootEntry.setMediaTypeString(mMediaType);
     }
-    ZipOutputStream zos = new ZipOutputStream(odfStream);
-    try {
-      // remove mediatype path and use it as first
-      this.mManifestEntries.remove(OdfFile.MEDIA_TYPE.getPath());
-      Set<String> keys = mManifestEntries.keySet();
-      boolean isFirstFile = true;
-      CRC32 crc = new CRC32();
-      long modTime = (new java.util.Date()).getTime();
-      byte[] data = null;
-      for (String path : keys) {
-        // ODF requires the "mimetype" file to be at first in the package
-        if (isFirstFile) {
-          isFirstFile = false;
-          // create "mimetype" from current attribute value
-          data = mMediaType.getBytes("UTF-8");
-          createZipEntry(OdfFile.MEDIA_TYPE.getPath(), data, zos, modTime, crc);
-        }
-        // create an entry, but NOT for "ODF document directory", "MANIFEST" or "mimetype"
-        if (!path.endsWith(SLASH)
-            && !path.equals(OdfPackage.OdfFile.MANIFEST.getPath())
-            && !path.equals(OdfPackage.OdfFile.MEDIA_TYPE.getPath())) {
-          data = getBytes(path);
-          createZipEntry(path, data, zos, modTime, crc);
-        }
-        data = null;
+    ZipArchiveOutputStream zos = new ZipArchiveOutputStream(odfStream);
+    // remove mediatype path and use it as first
+    this.mManifestEntries.remove(OdfFile.MEDIA_TYPE.getPath());
+    Set<String> keys = mManifestEntries.keySet();
+    boolean isFirstFile = true;
+    CRC32 crc = new CRC32();
+    long modTime = (new java.util.Date()).getTime();
+    byte[] data = null;
+    for (String path : keys) {
+      // ODF requires the "mimetype" file to be at first in the package
+      if (isFirstFile) {
+        isFirstFile = false;
+        // create "mimetype" from current attribute value
+        data = mMediaType.getBytes("UTF-8");
+        createZipEntry(OdfFile.MEDIA_TYPE.getPath(), data, zos, modTime, crc);
       }
-      // Create "META-INF/" directory
-      createZipEntry("META-INF/", null, zos, modTime, crc);
-      // Create "META-INF/manifest.xml" file after all entries with potential encryption have been
-      // added
-      data = getBytes(OdfFile.MANIFEST.getPath());
-      createZipEntry(OdfFile.MANIFEST.getPath(), data, zos, modTime, crc);
-    } finally {
-      zos.flush();
-      zos.close();
+      // create an entry, but NOT for "ODF document directory", "MANIFEST" or "mimetype"
+      if (!path.endsWith(SLASH)
+          && !path.equals(OdfPackage.OdfFile.MANIFEST.getPath())
+          && !path.equals(OdfPackage.OdfFile.MEDIA_TYPE.getPath())) {
+        data = getBytes(path);
+        createZipEntry(path, data, zos, modTime, crc);
+      }
+      data = null;
     }
+    // Create "META-INF/" directory
+    createZipEntry("META-INF/", null, zos, modTime, crc);
+    // Create "META-INF/manifest.xml" file after all entries with potential encryption have been
+    // added
+    data = getBytes(OdfFile.MANIFEST.getPath());
+    createZipEntry(OdfFile.MANIFEST.getPath(), data, zos, modTime, crc);
+    zos.flush();
+    zos.close();
     odfStream.flush();
   }
 
   private void createZipEntry(
-      String path, byte[] data, ZipOutputStream zos, long modTime, CRC32 crc) throws IOException {
-    ZipEntry ze = null;
+      String path, byte[] data, ZipArchiveOutputStream zos, long modTime, CRC32 crc)
+      throws IOException {
+    ZipArchiveEntry ze = null;
     ze = mZipEntries.get(path);
     if (ze == null) {
-      ze = new ZipEntry(path);
+      ze = new ZipArchiveEntry(path);
     }
     ze.setTime(modTime);
     if (fileNeedsCompression(path)) {
-      ze.setMethod(ZipEntry.DEFLATED);
+      ze.setMethod(ZipArchiveEntry.DEFLATED);
     } else {
-      ze.setMethod(ZipEntry.STORED);
+      ze.setMethod(ZipArchiveEntry.STORED);
     }
     crc.reset();
     if (data != null) {
@@ -1193,7 +1192,7 @@ public class OdfPackage implements Closeable {
       if (data.length > 0 && fileNeedsEncryption(path)) {
         data = encryptData(data, fileEntry);
         // encrypted file entries shall be flagged as 'STORED'.
-        ze.setMethod(ZipEntry.STORED);
+        ze.setMethod(ZipArchiveEntry.STORED);
         // the size of the encrypted file should replace the real
         // size value.
         ze.setCompressedSize(data.length);
@@ -1219,11 +1218,11 @@ public class OdfPackage implements Closeable {
       ze.setCrc(0);
       ze.setCompressedSize(-1);
     }
-    zos.putNextEntry(ze);
+    zos.putArchiveEntry(ze);
     if (data != null) {
       zos.write(data, 0, data.length);
     }
-    zos.closeEntry();
+    zos.closeArchiveEntry();
     mZipEntries.put(path, ze);
   }
 
@@ -1683,9 +1682,9 @@ public class OdfPackage implements Closeable {
       throws SAXException, ParserConfigurationException, IllegalArgumentException,
           TransformerConfigurationException, TransformerException, IOException {
 
-    Document doc = mPkgDoms.get(internalPath);
-    if (doc != null) {
-      return doc;
+    Document dom = mPkgDoms.get(internalPath);
+    if (dom != null) {
+      return dom;
     }
 
     InputStream is = getInputStream(internalPath);
@@ -1721,13 +1720,13 @@ public class OdfPackage implements Closeable {
     InputSource ins = new InputSource(is);
     ins.setSystemId(uri);
 
-    doc = builder.parse(ins);
+    dom = builder.parse(ins);
 
-    if (doc != null) {
-      mPkgDoms.put(internalPath, doc);
+    if (dom != null) {
+      mPkgDoms.put(internalPath, dom);
       mMemoryFileCache.remove(internalPath);
     }
-    return doc;
+    return dom;
   }
 
   /**
@@ -1853,7 +1852,7 @@ public class OdfPackage implements Closeable {
     }
     // if not available, check if file exists in ZIP
     if (data == null) {
-      ZipEntry entry = null;
+      ZipArchiveEntry entry = null;
       if ((entry = mZipEntries.get(internalPath)) != null) {
         InputStream inputStream = null;
         try {
@@ -2190,7 +2189,7 @@ public class OdfPackage implements Closeable {
   public InputStream getInputStream(String internalPath, boolean useOriginal) {
     InputStream stream = null;
     if (useOriginal) {
-      ZipEntry entry = mOriginalZipEntries.get(internalPath);
+      ZipArchiveEntry entry = mOriginalZipEntries.get(internalPath);
       if (entry != null) {
         try {
           stream = mZipFile.getInputStream(entry);
@@ -2289,9 +2288,8 @@ public class OdfPackage implements Closeable {
     long size = -1;
     internalPath = normalizePath(internalPath);
     if (mZipEntries != null && mZipEntries.containsKey(internalPath)) {
-      ZipEntry zipEntry = mZipEntries.get(internalPath);
+      ZipArchiveEntry zipEntry = mZipEntries.get(internalPath);
       size = zipEntry.getSize();
-      ;
     }
     return size;
   }
